@@ -26,8 +26,18 @@ module.exports = {
     phoneSecondary: '9644095290',
     whatsapp: '9243791529',
     whatsappLink: 'https://wa.me/919243791529?text=Hi%20Think%20Unlimited!%20Mujhe%20Class%2010%20Maths%20e-book%20ke%20baare%20mein%20poochna%20hai',
-    supportEmail: 'a2043728022@gmail.com'
+    supportEmail: 'a2043728022@gmail.com',
+    upiId: '9243791529@axl',
+    upiQrImage: '/images/upi-qr.png'
   },
+
+  upi: {
+    id: '9243791529@axl',
+    qrImage: '/images/upi-qr.png',
+    payeeName: 'Think Unlimited',
+    amount: 39
+  },
+
 
   socials: {
     instagram: '@thinkunlimited_ed',

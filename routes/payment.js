@@ -129,6 +129,8 @@ router.post('/verify-payment', async (req, res) => {
       razorpay_order_id, 
       razorpay_payment_id, 
       razorpay_signature,
+      utr_number,
+      payment_method,
       isTestSimulation 
     } = req.body;
 
@@ -141,7 +143,7 @@ router.post('/verify-payment', async (req, res) => {
       return res.status(404).json({ error: 'Order record nahi mila' });
     }
 
-    // If order was already marked paid (e.g. by webhook earlier)
+    // If order was already marked paid
     if (order.status === 'paid' && order.downloadToken) {
       return res.json({
         success: true,
@@ -151,8 +153,8 @@ router.post('/verify-payment', async (req, res) => {
       });
     }
 
-    // Signature Verification
-    if (razorpayInstance && RAZORPAY_KEY_SECRET) {
+    // Signature Verification (only if real Razorpay gateway signature provided)
+    if (razorpayInstance && RAZORPAY_KEY_SECRET && razorpay_signature && razorpay_signature !== 'test_simulation_signature') {
       const generatedSignature = crypto
         .createHmac('sha256', RAZORPAY_KEY_SECRET)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -165,19 +167,26 @@ router.post('/verify-payment', async (req, res) => {
         });
       }
     } else {
-      // In test simulation mode without API keys
-      console.log('Verifying test payment simulation:', razorpay_order_id);
+      console.log('Verifying UPI / QR payment for order:', razorpay_order_id, 'UTR:', utr_number || razorpay_payment_id);
     }
 
     // Generate secure download token
     const downloadToken = TokenManager.createDownloadToken(order.id, order.email);
 
+    // Final payment reference ID (UTR or generated transaction ID)
+    const finalPaymentId = utr_number ? utr_number.trim() : (razorpay_payment_id || `UPI_${Date.now()}`);
+
     // Mark paid in DB
     const updatedOrder = Database.markAsPaid(
       razorpay_order_id, 
-      razorpay_payment_id || `sim_pay_${Date.now()}`, 
-      downloadToken
+      finalPaymentId, 
+      downloadToken,
+      {
+        paymentMethod: payment_method || (utr_number ? 'PhonePe UPI QR' : 'UPI (9243791529@axl)'),
+        utrNumber: finalPaymentId
+      }
     );
+
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.get('host');

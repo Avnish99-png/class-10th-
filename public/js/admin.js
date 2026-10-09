@@ -130,10 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <td><strong>₹${o.amount || 39}</strong></td>
           <td><span class="status-badge ${statusClass}">${o.status}</span></td>
           <td>${o.downloadCount || 0}</td>
-          <td style="font-family: monospace; font-size: 0.8rem;">${o.razorpayPaymentId || '-'}</td>
+          <td style="font-family: monospace; font-size: 0.8rem;">
+            <div><strong>${escapeHtml(o.razorpayPaymentId || o.utrNumber || '-')}</strong></div>
+            <div style="font-size: 0.72rem; color: #166534;">${escapeHtml(o.paymentMethod || 'PhonePe UPI')}</div>
+          </td>
         </tr>
       `;
     }).join('');
+
   }
 
   function escapeHtml(text) {

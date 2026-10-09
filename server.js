@@ -27,11 +27,13 @@ app.get('/api/config', (req, res) => {
     brand: siteConfig.brand,
     product: siteConfig.product,
     contacts: siteConfig.contacts,
+    upi: siteConfig.upi,
     socials: siteConfig.socials,
     refundPolicy: siteConfig.refundPolicy,
     analytics: siteConfig.analytics
   });
 });
+
 
 // Mount Routes
 app.use('/api', require('./routes/payment'));

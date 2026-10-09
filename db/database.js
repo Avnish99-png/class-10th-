@@ -78,13 +78,15 @@ const Database = {
   },
 
   // Update order status after payment verification
-  markAsPaid(razorpayOrderId, paymentId, downloadToken) {
+  markAsPaid(razorpayOrderId, paymentId, downloadToken, options = {}) {
     const orders = readOrders();
     const orderIndex = orders.findIndex(o => o.razorpayOrderId === razorpayOrderId);
     if (orderIndex === -1) return null;
 
     orders[orderIndex].status = 'paid';
     orders[orderIndex].razorpayPaymentId = paymentId;
+    orders[orderIndex].paymentMethod = options.paymentMethod || 'UPI QR';
+    orders[orderIndex].utrNumber = options.utrNumber || paymentId;
     orders[orderIndex].downloadToken = downloadToken;
     orders[orderIndex].paidAt = new Date().toISOString();
     orders[orderIndex].updatedAt = new Date().toISOString();
@@ -92,6 +94,7 @@ const Database = {
     writeOrders(orders);
     return orders[orderIndex];
   },
+
 
   // Increment download counter
   recordDownload(token) {
