@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Successful 🎉 | Class 10 Maths Made Easy</title>
+  <title>Payment Successful 🎉 | Download Class 10 Maths Made Easy PDF</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     .success-page-wrap {
@@ -11,74 +11,177 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 30px 16px;
+      padding: 40px 16px;
+      background: var(--paper);
     }
     .success-card {
       background: #FFFFFF;
       border: 3px solid var(--navy);
       border-radius: 16px;
       box-shadow: 8px 8px 0px var(--navy);
-      max-width: 580px;
+      max-width: 620px;
       width: 100%;
-      padding: 40px 32px;
+      padding: 36px 28px;
       position: relative;
       text-align: center;
     }
+    .celebrate-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #DCFCE7;
+      color: #166534;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1.5px solid #166534;
+      margin-bottom: 14px;
+    }
+    .product-box {
+      background: #FFFDF5;
+      border: 2px solid var(--navy);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0 16px;
+      text-align: left;
+      box-shadow: 3px 3px 0 var(--navy);
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .pdf-icon-tag {
+      width: 60px;
+      height: 70px;
+      background: #FFEBEE;
+      border: 2px solid var(--red);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 2px 2px 0 var(--navy);
+    }
     .order-badge-row {
       background: #F8FAFC;
-      border: 2px dashed #CBD5E1;
+      border: 1.5px dashed #CBD5E1;
       border-radius: 8px;
-      padding: 16px;
-      margin: 24px 0;
+      padding: 14px 16px;
+      margin-bottom: 24px;
       text-align: left;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
     }
     .order-badge-row div {
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+    }
+    .action-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 20px 0;
+    }
+    @media (min-width: 480px) {
+      .action-btn-group {
+        flex-direction: row;
+      }
+      .action-btn-group .btn-primary, 
+      .action-btn-group .btn-secondary {
+        flex: 1;
+      }
+    }
+    .auto-download-notice {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
     }
   </style>
 </head>
 <body>
   <div class="success-page-wrap">
     <div class="success-card">
-      <span class="rubber-stamp stamp-yellow" style="font-size: 0.9rem; margin-bottom: 12px;">PAYMENT CONFIRMED</span>
-
+      <div class="celebrate-badge">
+        <span>✔ Payment Verified & Successful</span>
+      </div>
       
-      <h1 style="font-size: 2.2rem; margin: 8px 0; color: var(--navy);">
-        Badhaai Ho! 🎉
+      <h1 style="font-size: clamp(1.8rem, 4vw, 2.3rem); margin: 6px 0; color: var(--navy);">
+        Badhaai Ho! Aapki Book Tayar Hai 🎉
       </h1>
-      <p class="handwritten" style="font-size: 1.35rem; color: #1E293B;">
-        Aapki Class 10 Maths Made Easy PDF taiyaar hai!
+      <p class="handwritten" style="font-size: 1.25rem; color: #1E293B;">
+        "Class 10 Maths Made Easy" ka instant download unlock ho chuka hai.
       </p>
 
-      <div class="order-badge-row" id="orderDetailsBox">
-        <div><strong>Order ID:</strong> <span id="displayOrderId">Processing...</span></div>
-        <div><strong>Status:</strong> <span style="color: #1B873F; font-weight: bold;">Paid & Verified ✔</span></div>
-        <div><strong>Validity:</strong> 48 Ghante (Max 5 Downloads)</div>
+      <!-- Auto-download countdown notice -->
+      <div id="autoDownloadNotice" class="auto-download-notice">
+        ⏳ <strong>PDF download automatically shuru ho raha hai...</strong> (Agar shuru na ho, to neeche button dabayein)
       </div>
 
-      <div style="margin: 28px 0;">
-        <a id="downloadBtn" href="#" class="btn-primary" style="font-size: 1.25rem; width: 100%;">
-          📥 Download PDF E-Book Now
+      <!-- PDF Product Item Card -->
+      <div class="product-box">
+        <div class="pdf-icon-tag">
+          <span style="font-size: 0.65rem; font-weight: 900; color: var(--red); letter-spacing: 0.05em;">PDF</span>
+          <span style="font-size: 1.4rem;">📄</span>
+        </div>
+        <div>
+          <h3 style="font-size: 1.15rem; color: var(--navy); margin-bottom: 2px;">
+            Class 10 Maths Made Easy
+          </h3>
+          <div style="font-size: 0.82rem; color: #64748B;">
+            CBSE Board Exam Edition 2026/27 • 14 Chapters • 20 Pages
+          </div>
+          <div style="font-size: 0.78rem; font-weight: bold; color: #166534; margin-top: 4px;">
+            ✔ Full Formula Sheet + Shortcut Tricks + Silly Mistake Alerts
+          </div>
+        </div>
+      </div>
+
+      <!-- Download Action Buttons -->
+      <div class="action-btn-group">
+        <!-- Direct File Download -->
+        <a id="downloadBtn" href="#" class="btn-primary" style="font-size: 1.15rem; padding: 14px 20px;">
+          📥 Download PDF E-Book
+        </a>
+
+        <!-- In-browser Online Preview -->
+        <a id="viewBtn" href="#" target="_blank" class="btn-secondary" style="font-size: 1rem; padding: 14px 20px; color: var(--navy); border-color: var(--navy);">
+          👁️ Open & Read Online
         </a>
       </div>
 
-      <p style="font-size: 0.88rem; color: #64748B; line-height: 1.5;">
-        Yeh link aapke email par bhi bhej diya gaya hai. Kripya file ko apne phone/laptop mein save kar lein.
+      <!-- Order Receipt Details -->
+      <div class="order-badge-row">
+        <div><strong>Order ID:</strong> <span id="displayOrderId">Loading...</span></div>
+        <div><strong>Payment Status:</strong> <span style="color: #166534; font-weight: bold;">Confirmed & Verified (₹39) ✔</span></div>
+        <div><strong>Access:</strong> Lifetime Access (Aap is link se kabhi bhi download kar sakte hain)</div>
+      </div>
+
+      <p style="font-size: 0.84rem; color: #64748B; line-height: 1.5; margin-bottom: 16px;">
+        💡 Yeh download link aapke email par bhi save kar diya gaya hai. Kripya PDF ko apne phone ya laptop memory mein save kar lein.
       </p>
 
-      <div style="border-top: 1px dashed #CBD5E1; margin-top: 24px; padding-top: 18px; font-size: 0.85rem; color: #475569;">
-        <p><strong>Download mein koi issue aa raha hai?</strong></p>
-        <p style="margin-top: 4px;">
-          Hamari support team se WhatsApp par turant baat karein: 
-          <a href="https://wa.me/919243791529" style="color: var(--navy); font-weight: bold;">+91 9243791529</a>
+      <!-- WhatsApp Help & Support -->
+      <div style="border-top: 1px dashed #CBD5E1; padding-top: 16px; font-size: 0.85rem; color: #475569;">
+        <p style="margin-bottom: 6px;"><strong>File download karne mein koi dikkat aa rahi hai?</strong></p>
+        <p style="margin: 0;">
+          Seedha WhatsApp par PDF paayein: 
+          <a id="waDirectBtn" href="https://wa.me/919243791529?text=Hi%20Think%20Unlimited!%20Maine%20Class%2010%20Maths%20e-book%20ke%20liye%2039%20pay%20kiya%20hai,%20mujhe%20PDF%20WhatsApp%20par%20bhej%20do" target="_blank" style="color: #166534; font-weight: bold; text-decoration: underline;">
+            💬 WhatsApp: +91 9243791529
+          </a>
         </p>
-        <a href="/" style="display: inline-block; margin-top: 14px; color: var(--navy); text-decoration: underline;">
+
+        <a href="/" style="display: inline-block; margin-top: 16px; color: var(--navy); font-size: 0.88rem; text-decoration: underline;">
           ← Home Page Par Wapas Jaayein
         </a>
       </div>
     </div>
   </div>
+
+  <!-- Hidden iframe for reliable background auto-download -->
+  <iframe id="downloadFrame" style="display: none;"></iframe>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -88,17 +191,46 @@
 
       if (orderId) {
         document.getElementById('displayOrderId').textContent = orderId;
+        const waLink = `https://wa.me/919243791529?text=Hi%20Think%20Unlimited!%20Maine%20Class%2010%20Maths%20e-book%20ke%20liye%20pay%20kiya%20hai%20(Order%20ID:%20${orderId}),%20mujhe%20PDF%20WhatsApp%20par%20bhi%20bhej%20do`;
+        document.getElementById('waDirectBtn').href = waLink;
       } else {
         document.getElementById('displayOrderId').textContent = 'CONFIRMED';
       }
 
       const downloadBtn = document.getElementById('downloadBtn');
+      const viewBtn = document.getElementById('viewBtn');
+      const noticeBox = document.getElementById('autoDownloadNotice');
+
       if (token) {
-        downloadBtn.href = `/download/${token}`;
+        const downloadUrl = `/download/${token}`;
+        const viewUrl = `/download/${token}?view=1`;
+
+        downloadBtn.href = downloadUrl;
+        viewBtn.href = viewUrl;
+
+        // Auto-trigger download after 1.5 seconds like professional e-commerce sites
+        setTimeout(() => {
+          try {
+            // Trigger download via hidden iframe (cleanest method without page redirect)
+            document.getElementById('downloadFrame').src = downloadUrl;
+            noticeBox.innerHTML = '✔ <strong>Download trigger ho gaya hai!</strong> Agar download popup na dikhe, to upar wala <em>"Download PDF"</em> button dabayein.';
+            noticeBox.style.background = '#DCFCE7';
+            noticeBox.style.borderColor = '#86EFAC';
+            noticeBox.style.color = '#166534';
+          } catch (e) {
+            console.log('Auto download triggered');
+          }
+        }, 1500);
+
       } else {
-        downloadBtn.textContent = 'Invalid / Missing Token';
+        downloadBtn.textContent = 'Token Missing / Expired';
         downloadBtn.style.opacity = '0.5';
         downloadBtn.removeAttribute('href');
+        viewBtn.style.display = 'none';
+        noticeBox.textContent = 'Download link generate karne mein problem aayi. Kripya WhatsApp support par contact karein.';
+        noticeBox.style.background = '#FEE2E2';
+        noticeBox.style.borderColor = '#FCA5A5';
+        noticeBox.style.color = '#991B1B';
       }
     });
   </script>

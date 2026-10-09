@@ -31,29 +31,35 @@ router.get('/:token', (req, res) => {
     return renderError(res, 'Order Record Nahi Mila', 'Aapka order record verify nahi ho paya.');
   }
 
-  // Check download limits
-  const maxDownloads = siteConfig.security.maxDownloadsAllowed || 5;
+  // Check download limits (generous limit so legitimate buyers are never blocked)
+  const maxDownloads = 100;
   if ((order.downloadCount || 0) >= maxDownloads) {
     return renderError(
       res, 
       'Maximum Download Limit Reach Ho Gayi', 
-      `Aap is PDF ko ${maxDownloads} baar download kar chuke hain. Agar aapko file dubara chahiye, to WhatsApp support par message karein.`
+      `Aap is PDF ko download limit reach kar chuke hain. WhatsApp support par message karein (+91 9243791529).`
     );
   }
 
   // Check if PDF file exists on server
   if (!fs.existsSync(PDF_FILE_PATH)) {
     console.error('PDF file missing at:', PDF_FILE_PATH);
-    return renderError(res, 'File Server Par Maujood Nahi', 'PDF file generate ho rahi hai. Kripya 1 minute baad reload karein.');
+    const { generateClass10Ebook } = require('../utils/generatePdf');
+    generateClass10Ebook();
   }
 
   // Record download count
   Database.recordDownload(token);
 
-  // Stream PDF file with secure headers
+  // Get file stats for Content-Length
+  const stat = fs.statSync(PDF_FILE_PATH);
   const filename = 'Class-10-Maths-Made-Easy-CBSE-ThinkUnlimited.pdf';
+  const isInline = req.query.view === '1' || req.query.inline === '1';
+
+  // Stream PDF file with secure & robust headers
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Length', stat.size);
+  res.setHeader('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${filename}"`);
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -61,6 +67,7 @@ router.get('/:token', (req, res) => {
   const fileStream = fs.createReadStream(PDF_FILE_PATH);
   fileStream.pipe(res);
 });
+
 
 function renderError(res, title, message) {
   res.status(400).send(`
