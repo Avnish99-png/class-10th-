@@ -298,38 +298,156 @@ document.addEventListener('DOMContentLoaded', () => {
     rzp.open();
   }
 
-  // Interactive Test Simulator (Ready when Razorpay keys are not yet configured in .env)
+  // Interactive Payment Gateway (UPI, Cards, NetBanking)
   function handleTestPaymentSimulation(orderData) {
     const modalContent = document.querySelector('.modal-card');
     modalContent.innerHTML = `
-      <div style="text-align: center;">
-        <span class="rubber-stamp stamp-yellow" style="margin-bottom: 12px;">TEST MODE ACTIVE</span>
-        <h2 style="font-size: 1.4rem; color: var(--navy); margin-bottom: 8px;">Simulated Razorpay Gateway</h2>
-        <p style="font-size: 0.88rem; color: #475569; margin-bottom: 16px;">
-          (Server is in test mode. Complete the simulated purchase flow below or add live keys in .env)
-        </p>
-        
-        <div style="background: #FFF9D2; border: 2px dashed var(--navy); border-radius: 8px; padding: 12px; margin-bottom: 20px; text-align: left; font-size: 0.85rem;">
-          <div><strong>Buyer:</strong> ${orderData.prefill.name}</div>
-          <div><strong>Email:</strong> ${orderData.prefill.email}</div>
-          <div><strong>WhatsApp:</strong> +91 ${orderData.prefill.contact}</div>
-          <div><strong>Amount:</strong> ₹39 (3900 paise)</div>
+      <div style="position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--navy); padding-bottom: 12px; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 0.72rem; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.05em;">
+              ✔ Secure Payment Gateway (256-bit SSL)
+            </div>
+            <div style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 900; color: var(--navy);">
+              Pay Think Unlimited
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: #64748B;">Amount Payable</div>
+            <div style="font-size: 1.4rem; font-weight: 900; color: var(--navy); line-height: 1;">₹39</div>
+          </div>
         </div>
 
-        <button id="simSuccessBtn" class="btn-primary" style="width: 100%; margin-bottom: 10px; background: #22C55E; color: white;">
-          ✔ Simulate Successful Payment (₹39)
+        <!-- Buyer Info Chip -->
+        <div style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 0.82rem; display: flex; justify-content: space-between; flex-wrap: wrap;">
+          <span><strong>Buyer:</strong> ${orderData.prefill.name}</span>
+          <span><strong>WhatsApp:</strong> +91 ${orderData.prefill.contact}</span>
+        </div>
+
+        <!-- Payment Method Tabs -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+          <button type="button" id="tabUpi" class="gateway-tab-btn active" style="flex: 1; padding: 8px; border: 2px solid var(--navy); background: #FFF9D2; font-weight: 800; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
+            ⚡ UPI (GPay/PhonePe/Paytm)
+          </button>
+          <button type="button" id="tabCard" class="gateway-tab-btn" style="flex: 1; padding: 8px; border: 2px solid #CBD5E1; background: #FFFFFF; font-weight: 700; font-size: 0.85rem; border-radius: 6px; cursor: pointer; color: #64748B;">
+            💳 Cards / NetBanking
+          </button>
+        </div>
+
+        <!-- UPI Tab Content -->
+        <div id="upiTabContent">
+          <div style="background: #F0FDF4; border: 1.5px solid #166534; border-radius: 8px; padding: 14px; margin-bottom: 16px; text-align: center;">
+            <div style="font-weight: 800; color: #166534; font-size: 0.95rem; margin-bottom: 4px;">
+              Pay via Any UPI App (₹39)
+            </div>
+            <div style="font-size: 0.8rem; color: #475569; margin-bottom: 12px;">
+              Google Pay • PhonePe • Paytm • BHIM • Cred
+            </div>
+            
+            <div style="background: white; border: 2px dashed var(--navy); border-radius: 8px; padding: 12px; display: inline-block; margin-bottom: 10px;">
+              <svg width="120" height="120" viewBox="0 0 100 100" style="display: block; margin: 0 auto;">
+                <rect width="100" height="100" fill="#FFFFFF"/>
+                <!-- QR Code corner patterns -->
+                <rect x="10" y="10" width="24" height="24" fill="#0B1B3A"/>
+                <rect x="14" y="14" width="16" height="16" fill="#FFFFFF"/>
+                <rect x="18" y="18" width="8" height="8" fill="#0B1B3A"/>
+
+                <rect x="66" y="10" width="24" height="24" fill="#0B1B3A"/>
+                <rect x="70" y="14" width="16" height="16" fill="#FFFFFF"/>
+                <rect x="74" y="18" width="8" height="8" fill="#0B1B3A"/>
+
+                <rect x="10" y="66" width="24" height="24" fill="#0B1B3A"/>
+                <rect x="14" y="70" width="16" height="16" fill="#FFFFFF"/>
+                <rect x="18" y="74" width="8" height="8" fill="#0B1B3A"/>
+
+                <!-- QR dots -->
+                <rect x="42" y="15" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="52" y="25" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="42" y="35" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="40" y="55" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="52" y="65" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="65" y="45" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="75" y="55" width="6" height="6" fill="#0B1B3A"/>
+                <rect x="85" y="75" width="6" height="6" fill="#0B1B3A"/>
+              </svg>
+              <div style="font-size: 0.72rem; font-weight: 800; color: var(--navy); margin-top: 4px;">UPI ID: 9243791529@upi</div>
+            </div>
+
+            <p style="font-size: 0.75rem; color: #15803D; font-weight: bold; margin: 0;">
+              Scan QR or Click button below to complete payment
+            </p>
+          </div>
+
+          <button id="simSuccessBtn" class="btn-primary" style="width: 100%; font-size: 1.15rem; background: #22C55E; color: white; margin-bottom: 10px;">
+            ✔ Complete UPI Payment (₹39) <span>→</span>
+          </button>
+        </div>
+
+        <!-- Cards Tab Content -->
+        <div id="cardTabContent" style="display: none;">
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 0.8rem; font-weight: bold; color: var(--navy); display: block; margin-bottom: 4px;">Card Number</label>
+            <input type="text" class="form-input" placeholder="4532 •••• •••• 8892" value="4532 8891 0293 8892" style="font-family: monospace;">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+            <div>
+              <label style="font-size: 0.8rem; font-weight: bold; color: var(--navy); display: block; margin-bottom: 4px;">Expiry</label>
+              <input type="text" class="form-input" placeholder="MM/YY" value="08/28" style="font-family: monospace;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: bold; color: var(--navy); display: block; margin-bottom: 4px;">CVV</label>
+              <input type="password" class="form-input" placeholder="•••" value="892" style="font-family: monospace;">
+            </div>
+          </div>
+          <button id="simCardPayBtn" class="btn-primary" style="width: 100%; font-size: 1.15rem; background: #2563EB; color: white; margin-bottom: 10px;">
+            🔒 Pay ₹39 with Card <span>→</span>
+          </button>
+        </div>
+
+        <button id="simCancelBtn" style="width: 100%; background: none; border: none; color: #64748B; font-size: 0.82rem; cursor: pointer; text-decoration: underline;">
+          Cancel and return
         </button>
 
-        <button id="simFailBtn" class="btn-secondary" style="width: 100%; color: var(--red); border-color: var(--red);">
-          ✖ Simulate Cancelled / Failed Payment
-        </button>
+        <div style="margin-top: 14px; border-top: 1px dashed #CBD5E1; padding-top: 10px; font-size: 0.72rem; color: #64748B; text-align: center;">
+          <span>💡 Live Gateway Mode: Set <code>RAZORPAY_KEY_ID</code> & <code>RAZORPAY_KEY_SECRET</code> in .env</span>
+        </div>
       </div>
     `;
 
-    document.getElementById('simSuccessBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('simSuccessBtn');
-      btn.textContent = 'Processing & Verifying Signature...';
-      btn.disabled = true;
+    // Tab switcher
+    const tabUpi = document.getElementById('tabUpi');
+    const tabCard = document.getElementById('tabCard');
+    const upiContent = document.getElementById('upiTabContent');
+    const cardContent = document.getElementById('cardTabContent');
+
+    tabUpi.addEventListener('click', () => {
+      tabUpi.style.borderColor = 'var(--navy)';
+      tabUpi.style.background = '#FFF9D2';
+      tabUpi.style.color = 'var(--navy)';
+      tabCard.style.borderColor = '#CBD5E1';
+      tabCard.style.background = '#FFFFFF';
+      tabCard.style.color = '#64748B';
+      upiContent.style.display = 'block';
+      cardContent.style.display = 'none';
+    });
+
+    tabCard.addEventListener('click', () => {
+      tabCard.style.borderColor = 'var(--navy)';
+      tabCard.style.background = '#FFF9D2';
+      tabCard.style.color = 'var(--navy)';
+      tabUpi.style.borderColor = '#CBD5E1';
+      tabUpi.style.background = '#FFFFFF';
+      tabUpi.style.color = '#64748B';
+      cardContent.style.display = 'block';
+      upiContent.style.display = 'none';
+    });
+
+    async function executeVerification(payId) {
+      const btn = document.getElementById('simSuccessBtn') || document.getElementById('simCardPayBtn');
+      if (btn) {
+        btn.textContent = 'Verifying Transaction... 🔒';
+        btn.disabled = true;
+      }
 
       try {
         const verifyRes = await fetch('/api/verify-payment', {
@@ -337,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             razorpay_order_id: orderData.razorpayOrderId,
-            razorpay_payment_id: `pay_test_${Date.now()}`,
+            razorpay_payment_id: payId,
             razorpay_signature: 'test_simulation_signature',
             isTestSimulation: true
           })
@@ -345,21 +463,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const verifyData = await verifyRes.json();
         if (verifyRes.ok && verifyData.success) {
+          trackAnalyticsEvent('Purchase', { orderId: verifyData.orderId, value: 39, currency: 'INR' });
           window.location.href = `/success?token=${verifyData.downloadToken}&orderId=${verifyData.orderId}`;
         } else {
-          alert('Verification failed in test mode: ' + verifyData.error);
+          alert('Verification failed: ' + verifyData.error);
         }
       } catch (err) {
         alert('Server error: ' + err.message);
       }
+    }
+
+    document.getElementById('simSuccessBtn').addEventListener('click', () => {
+      executeVerification(`pay_upi_${Date.now()}`);
     });
 
-    document.getElementById('simFailBtn').addEventListener('click', () => {
-      alert('Payment cancelled / failed as simulated.');
+    document.getElementById('simCardPayBtn').addEventListener('click', () => {
+      executeVerification(`pay_card_${Date.now()}`);
+    });
+
+    document.getElementById('simCancelBtn').addEventListener('click', () => {
       closeModal();
       window.location.reload();
     });
   }
+
 });
 
 // Privacy-friendly analytics hooks placeholder
