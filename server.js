@@ -18,8 +18,8 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static assets from public
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static assets from public (no-cache for immediate client updates)
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
 
 // Public API Config endpoint
 app.get('/api/config', (req, res) => {

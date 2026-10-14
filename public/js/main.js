@@ -230,14 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.error || 'Order create nahi ho paya');
       }
 
-      // Check if real Cashfree or simulation mode
-      if (data.isSimulation || !data.paymentSessionId) {
-        // Run test / UPI QR simulator modal
-        handleTestPaymentSimulation(data);
-      } else {
-        // Open Real Cashfree Checkout Modal
-        openCashfreeCheckout(data);
-      }
+      // Open Real Cashfree Checkout
+      await openCashfreeCheckout(data);
     } catch (err) {
       console.error('Payment error:', err);
       alert(err.message || 'Payment start karne mein problem aayi. Kripya dobara try karein.');
@@ -246,53 +240,90 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Ensure Cashfree SDK is loaded
+  function ensureCashfreeLoaded() {
+    return new Promise((resolve) => {
+      if (window.Cashfree) return resolve(true);
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (window.Cashfree) {
+          clearInterval(interval);
+          resolve(true);
+        } else if (attempts >= 25) { // 2.5 seconds timeout
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 100);
+    });
+  }
+
   // Real Cashfree Checkout Handler
   async function openCashfreeCheckout(orderData) {
-    if (!window.Cashfree) {
-      await loadCashfreeSdk();
-    }
+    const mode = (orderData.environment && orderData.environment.toLowerCase() === 'prod') 
+      ? 'production' 
+      : 'sandbox';
 
-    if (!window.Cashfree) {
-      console.warn('Cashfree SDK unavailable, falling back to UPI QR simulation.');
-      handleTestPaymentSimulation(orderData);
-      return;
-    }
+    const sdkReady = await ensureCashfreeLoaded();
 
-    try {
-      const mode = (orderData.environment && orderData.environment.toLowerCase() === 'prod') 
-        ? 'production' 
-        : 'sandbox';
-      
-      const cashfree = window.Cashfree({ mode });
-      
-      cashfree.checkout({
-        paymentSessionId: orderData.paymentSessionId,
-        redirectTarget: '_modal'
-      }).then(async (result) => {
-        if (result.error) {
-          console.warn('Cashfree modal error or closed:', result.error);
-          if (result.error.message && !result.error.message.includes('closed') && !result.error.message.includes('dismissed')) {
-            alert('Payment notification: ' + result.error.message);
+    if (sdkReady && typeof window.Cashfree === 'function') {
+      try {
+        console.log(`Launching Cashfree ${mode} modal popup...`);
+        const cashfree = window.Cashfree({ mode });
+
+        cashfree.checkout({
+          paymentSessionId: orderData.paymentSessionId,
+          mode: mode,
+          redirectTarget: '_modal'
+        }).then(async (result) => {
+          if (result && result.error) {
+            console.warn('Cashfree modal status:', result.error);
+            if (result.error.message && !result.error.message.includes('closed') && !result.error.message.includes('dismissed')) {
+              alert('Payment notification: ' + result.error.message);
+            }
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+            return;
           }
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
-          return;
-        }
 
-        if (result.redirect) {
-          // Cashfree handles page redirect
-          return;
-        }
+          if (result && result.redirect) {
+            return;
+          }
 
-        submitBtn.innerHTML = '<span>Verifying Payment... 🔒</span>';
-        await verifyCashfreeOrder(orderData.cashfreeOrderId);
-      });
-    } catch (err) {
-      console.error('Cashfree checkout modal error:', err);
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
-      alert('Cashfree window open nahi ho payi: ' + err.message);
+          submitBtn.innerHTML = '<span>Verifying Payment... 🔒</span>';
+          await verifyCashfreeOrder(orderData.cashfreeOrderId);
+        });
+
+        return;
+      } catch (sdkErr) {
+        console.warn('Cashfree modal error, switching to direct hosted checkout:', sdkErr);
+      }
     }
+
+    // Direct Cashfree Hosted Checkout Fallback (100% reliable across all browsers & ad-blockers)
+    console.log('Redirecting to official Cashfree Checkout page...');
+    redirectToCashfreeHosted(orderData.paymentSessionId, mode);
+  }
+
+  // Cashfree Hosted Page Form Redirect
+  function redirectToCashfreeHosted(paymentSessionId, mode) {
+    const checkoutUrl = mode === 'production' 
+      ? 'https://api.cashfree.com/pg/view/sessions/checkout' 
+      : 'https://sandbox.cashfree.com/pg/view/sessions/checkout';
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = checkoutUrl;
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payment_session_id';
+    input.value = paymentSessionId;
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
   }
 
   // Cashfree Verification Handler
@@ -323,154 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
       submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
     }
   }
-
-  // PhonePe UPI QR & Instant Payment Flow
-  function handleTestPaymentSimulation(orderData) {
-    const modalContent = document.querySelector('.modal-card');
-    const upiId = '9243791529@axl';
-    const upiLink = `upi://pay?pa=${upiId}&pn=Think%20Unlimited&am=39&cu=INR&tn=Class%2010%20Maths%20Ebook`;
-
-    modalContent.innerHTML = `
-      <div style="position: relative;">
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--navy); padding-bottom: 12px; margin-bottom: 14px;">
-          <div>
-            <div style="font-size: 0.72rem; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.05em;">
-              ✔ Verified UPI Gateway
-            </div>
-            <div style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 900; color: var(--navy);">
-              Scan & Pay ₹39
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 0.72rem; color: #64748B;">Payable Amount</div>
-            <div style="font-size: 1.45rem; font-weight: 900; color: var(--navy); line-height: 1;">₹39</div>
-          </div>
-        </div>
-
-        <!-- Buyer Info Chip -->
-        <div style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 10px; margin-bottom: 14px; font-size: 0.8rem; display: flex; justify-content: space-between; flex-wrap: wrap;">
-          <span><strong>Student:</strong> ${escapeHtml(orderData.prefill?.name || orderData.customer?.name || 'Student')}</span>
-          <span><strong>WhatsApp:</strong> +91 ${escapeHtml(orderData.prefill?.contact || orderData.customer?.phone || '')}</span>
-        </div>
-
-        <!-- PhonePe QR Code Container -->
-        <div style="background: #FFFDF5; border: 2.5px solid var(--navy); box-shadow: 4px 4px 0 var(--navy); border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center;">
-          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px;">
-            <span style="font-size: 0.82rem; font-weight: 800; color: #5f259f; background: #F3E8FF; padding: 3px 10px; border-radius: 20px; border: 1px solid #5f259f;">
-              PhonePe / GPay / Paytm QR
-            </span>
-          </div>
-
-          <div style="background: white; border: 2px solid var(--navy); border-radius: 10px; padding: 10px; display: inline-block; box-shadow: 2px 2px 0 var(--navy); margin-bottom: 10px;">
-            <img src="/images/upi-qr.png" alt="PhonePe UPI QR Code" style="width: 200px; height: 200px; display: block; object-fit: contain; border-radius: 6px;">
-          </div>
-
-          <!-- UPI ID Copy Box -->
-          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #FFF9D2; border: 1.5px dashed var(--navy); border-radius: 8px; padding: 8px 12px; max-width: 320px; margin: 0 auto 12px;">
-            <div style="font-size: 0.85rem; font-weight: 800; font-family: monospace; color: var(--navy);">
-              ${upiId}
-            </div>
-            <button type="button" id="copyUpiBtn" style="background: var(--navy); color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; cursor: pointer;">
-              Copy ID
-            </button>
-          </div>
-
-          <!-- Direct Mobile Pay Button -->
-          <a href="${upiLink}" class="btn-primary" style="display: block; width: 100%; text-decoration: none; padding: 10px; font-size: 1rem; background: #5f259f; color: white; border-color: var(--navy); margin-bottom: 10px; box-shadow: 3px 3px 0 var(--navy);">
-            📱 Open in PhonePe / GPay / Paytm (₹39)
-          </a>
-
-          <div style="font-size: 0.75rem; color: #475569;">
-            Kisi bhi UPI app se QR scan karke <strong>₹39</strong> pay karein
-          </div>
-        </div>
-
-        <!-- UTR / Reference Entry -->
-        <div style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
-          <label for="utrInput" style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--navy); margin-bottom: 4px;">
-            Payment UTR / Ref No. (Optional):
-          </label>
-          <input type="text" id="utrInput" class="form-input" placeholder="e.g. 429188291028 ya screenshot reference" style="font-size: 0.85rem; padding: 8px 10px; margin-bottom: 10px;">
-          
-          <button type="button" id="confirmPaymentBtn" class="btn-primary" style="width: 100%; font-size: 1.15rem; background: #22C55E; color: white; box-shadow: 4px 4px 0 var(--navy);">
-            ✔ Payment Done – Download PDF Now 📥
-          </button>
-        </div>
-
-        <button type="button" id="cancelUpiModalBtn" style="width: 100%; background: none; border: none; color: #64748B; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
-          ← Wapas jaayein
-        </button>
-      </div>
-    `;
-
-    // Copy UPI ID button handler
-    const copyBtn = document.getElementById('copyUpiBtn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(upiId).then(() => {
-          copyBtn.textContent = 'Copied! ✔';
-          copyBtn.style.background = '#15803D';
-          setTimeout(() => {
-            copyBtn.textContent = 'Copy ID';
-            copyBtn.style.background = 'var(--navy)';
-          }, 2500);
-        }).catch(() => {
-          prompt('UPI ID copy karein:', upiId);
-        });
-      });
-    }
-
-    // Cancel / Back button
-    const cancelBtn = document.getElementById('cancelUpiModalBtn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
-        closeModal();
-        window.location.reload();
-      });
-    }
-
-    // Confirm Payment & Get PDF Handler
-    const confirmBtn = document.getElementById('confirmPaymentBtn');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', async () => {
-        const utrVal = document.getElementById('utrInput').value.trim();
-        confirmBtn.disabled = true;
-        confirmBtn.innerHTML = '<span>Verifying & Generating Link... 🔒</span>';
-
-        try {
-          const verifyOrderId = orderData.cashfreeOrderId || orderData.orderId || orderData.razorpayOrderId;
-          const verifyRes = await fetch('/api/cashfree/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              order_id: verifyOrderId,
-              utr_number: utrVal || `UPI_${Date.now()}`,
-              isSimulation: true
-            })
-          });
-
-          const verifyData = await verifyRes.json();
-          if (verifyRes.ok && verifyData.success) {
-            trackAnalyticsEvent('Purchase', { 
-              orderId: verifyData.orderId, 
-              value: 39, 
-              currency: 'INR',
-              method: 'UPI' 
-            });
-            window.location.href = `/success?token=${verifyData.downloadToken}&orderId=${verifyData.orderId}`;
-          } else {
-            alert('Verification issue: ' + (verifyData.error || 'Please try again.'));
-            confirmBtn.disabled = false;
-            confirmBtn.innerHTML = '✔ Payment Done – Download PDF Now 📥';
-          }
-        } catch (err) {
-          alert('Network issue: ' + err.message);
-          confirmBtn.disabled = false;
-          confirmBtn.innerHTML = '✔ Payment Done – Download PDF Now 📥';
-        }
-      });
-    }
   }
 
   function escapeHtml(text) {
