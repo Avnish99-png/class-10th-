@@ -260,6 +260,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Real Cashfree Checkout Handler
   async function openCashfreeCheckout(orderData) {
+    const paymentSessionId = orderData.paymentSessionId || orderData.payment_session_id;
+
+    if (!paymentSessionId) {
+      console.error('No paymentSessionId in orderData:', orderData);
+      alert('Cashfree payment session generate nahi ho paya. Kripya form dobara submit karein.');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+      return;
+    }
+
     const mode = (orderData.environment && orderData.environment.toLowerCase() === 'prod') 
       ? 'production' 
       : 'sandbox';
@@ -268,21 +278,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (sdkReady && typeof window.Cashfree === 'function') {
       try {
-        console.log(`Launching Cashfree ${mode} modal popup...`);
+        console.log(`Launching Cashfree ${mode} checkout modal with session:`, paymentSessionId);
         const cashfree = window.Cashfree({ mode });
 
         cashfree.checkout({
-          paymentSessionId: orderData.paymentSessionId,
+          paymentSessionId: paymentSessionId,
           mode: mode,
           redirectTarget: '_modal'
         }).then(async (result) => {
           if (result && result.error) {
-            console.warn('Cashfree modal status:', result.error);
-            if (result.error.message && !result.error.message.includes('closed') && !result.error.message.includes('dismissed')) {
-              alert('Payment notification: ' + result.error.message);
+            console.warn('Cashfree modal status, falling back to hosted page:', result.error);
+            // If user closed the popup, don't redirect
+            if (result.error.code === 'user_dropped' || (result.error.message && result.error.message.includes('closed'))) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+              return;
             }
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+            // For other errors, smoothly launch hosted checkout
+            redirectToCashfreeHosted(paymentSessionId, mode);
             return;
           }
 
@@ -302,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Direct Cashfree Hosted Checkout Fallback (100% reliable across all browsers & ad-blockers)
     console.log('Redirecting to official Cashfree Checkout page...');
-    redirectToCashfreeHosted(orderData.paymentSessionId, mode);
+    redirectToCashfreeHosted(paymentSessionId, mode);
   }
 
   // Cashfree Hosted Page Form Redirect

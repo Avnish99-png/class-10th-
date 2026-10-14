@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+require('dotenv').config();
 const siteConfig = require('../config/site.config');
 const Database = require('../db/database');
 const TokenManager = require('../utils/token');
@@ -7,9 +8,9 @@ const EmailService = require('../utils/email');
 
 // Dynamic Cashfree Gateway Credentials resolution
 function getCashfreeConfig() {
-  const appId = process.env.CASHFREE_APP_ID || '';
-  const secretKey = process.env.CASHFREE_SECRET_KEY || '';
-  const env = (process.env.CASHFREE_ENV || 'TEST').toUpperCase(); // TEST or PROD
+  const appId = (process.env.CASHFREE_APP_ID || '').trim();
+  const secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
+  const env = (process.env.CASHFREE_ENV || 'PROD').toUpperCase(); // TEST or PROD
   const apiVersion = process.env.CASHFREE_API_VERSION || '2023-08-01';
   const baseUrl = env === 'PROD' 
     ? 'https://api.cashfree.com/pg' 
@@ -128,6 +129,7 @@ router.post('/create-order', async (req, res) => {
         orderId: dbOrder.id,
         cashfreeOrderId: orderId,
         paymentSessionId: cfData.payment_session_id,
+        payment_session_id: cfData.payment_session_id,
         environment: cfConfig.env,
         amount: siteConfig.product.price,
         product: {
@@ -147,41 +149,9 @@ router.post('/create-order', async (req, res) => {
       });
 
     } else {
-      // Test simulation fallback only when keys are not configured
-      console.log('⚠️ Cashfree credentials not configured in .env - Running in Simulation Mode');
-
-      const dbOrder = Database.createOrder({
-        cashfreeOrderId: orderId,
-        gateway: 'cashfree_simulation',
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: cleanPhone,
-        amount: siteConfig.product.price,
-        currency: 'INR',
-        status: 'created'
-      });
-
-      return res.json({
-        success: true,
-        isSimulation: true,
-        orderId: dbOrder.id,
-        cashfreeOrderId: orderId,
-        environment: 'TEST',
-        amount: siteConfig.product.price,
-        product: {
-          title: siteConfig.product.title,
-          price: siteConfig.product.price
-        },
-        customer: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone: cleanPhone
-        },
-        prefill: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          contact: cleanPhone
-        }
+      console.error('Cashfree credentials missing or invalid');
+      return res.status(500).json({ 
+        error: 'Cashfree credentials configure nahi hain. Kripya support se sampark karein.' 
       });
     }
 
