@@ -354,7 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
       submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
     }
   }
-  }
 
   function escapeHtml(text) {
     if (!text) return '';
