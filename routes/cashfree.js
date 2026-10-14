@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 const siteConfig = require('../config/site.config');
 const Database = require('../db/database');
@@ -8,10 +10,29 @@ const EmailService = require('../utils/email');
 
 // Dynamic Cashfree Gateway Credentials resolution
 function getCashfreeConfig() {
-  const appId = (process.env.CASHFREE_APP_ID || '').trim();
-  const secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
-  const env = (process.env.CASHFREE_ENV || 'PROD').toUpperCase(); // TEST or PROD
+  let appId = (process.env.CASHFREE_APP_ID || '').trim();
+  let secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
+  let env = (process.env.CASHFREE_ENV || 'PROD').toUpperCase(); // TEST or PROD
   const apiVersion = process.env.CASHFREE_API_VERSION || '2023-08-01';
+
+  // If process.env variables are missing, read directly from .env file
+  if (!appId || !secretKey) {
+    try {
+      const envPath = path.join(__dirname, '..', '.env');
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const appMatch = envContent.match(/CASHFREE_APP_ID\s*=\s*([^\r\n]+)/);
+        const secMatch = envContent.match(/CASHFREE_SECRET_KEY\s*=\s*([^\r\n]+)/);
+        const envMatch = envContent.match(/CASHFREE_ENV\s*=\s*([^\r\n]+)/);
+        if (appMatch) appId = appMatch[1].trim();
+        if (secMatch) secretKey = secMatch[1].trim();
+        if (envMatch) env = envMatch[1].trim().toUpperCase();
+      }
+    } catch (e) {
+      console.error('Error reading .env directly:', e);
+    }
+  }
+
   const baseUrl = env === 'PROD' 
     ? 'https://api.cashfree.com/pg' 
     : 'https://sandbox.cashfree.com/pg';
