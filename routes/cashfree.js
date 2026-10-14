@@ -5,21 +5,22 @@ const Database = require('../db/database');
 const TokenManager = require('../utils/token');
 const EmailService = require('../utils/email');
 
-// Cashfree Gateway Credentials
-const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID || '';
-const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY || '';
-const CASHFREE_ENV = (process.env.CASHFREE_ENV || 'TEST').toUpperCase(); // TEST or PROD
-const CASHFREE_API_VERSION = process.env.CASHFREE_API_VERSION || '2023-08-01';
-
-const CASHFREE_BASE_URL = CASHFREE_ENV === 'PROD' 
-  ? 'https://api.cashfree.com/pg' 
-  : 'https://sandbox.cashfree.com/pg';
-
-function hasValidCredentials() {
-  return CASHFREE_APP_ID && 
-         CASHFREE_SECRET_KEY && 
-         !CASHFREE_APP_ID.includes('YOUR_') && 
-         !CASHFREE_SECRET_KEY.includes('YOUR_');
+// Dynamic Cashfree Gateway Credentials resolution
+function getCashfreeConfig() {
+  const appId = process.env.CASHFREE_APP_ID || '';
+  const secretKey = process.env.CASHFREE_SECRET_KEY || '';
+  const env = (process.env.CASHFREE_ENV || 'TEST').toUpperCase(); // TEST or PROD
+  const apiVersion = process.env.CASHFREE_API_VERSION || '2023-08-01';
+  const baseUrl = env === 'PROD' 
+    ? 'https://api.cashfree.com/pg' 
+    : 'https://sandbox.cashfree.com/pg';
+  const isValid = Boolean(
+    appId && 
+    secretKey && 
+    !appId.includes('YOUR_') && 
+    !secretKey.includes('YOUR_')
+  );
+  return { appId, secretKey, env, apiVersion, baseUrl, isValid };
 }
 
 // Helper: Indian mobile number validation
@@ -54,11 +55,28 @@ router.post('/create-order', async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
+    const cfConfig = getCashfreeConfig();
 
-    if (hasValidCredentials()) {
+    if (cfConfig.isValid) {
       // Real Cashfree API Call
-      console.log(`Connecting to Cashfree (${CASHFREE_ENV}) at: ${CASHFREE_BASE_URL}/orders`);
+      console.log(`Connecting to Cashfree (${cfConfig.env}) at: ${cfConfig.baseUrl}/orders`);
       
+      // Cashfree Production requires https return_url
+      let returnUrl;
+      if (process.env.APP_BASE_URL) {
+        returnUrl = `${process.env.APP_BASE_URL}/api/cashfree/return?order_id={order_id}`;
+      } else {
+        const safeProtocol = (protocol === 'https' || cfConfig.env === 'PROD') ? 'https' : protocol;
+        returnUrl = `${safeProtocol}://${host}/api/cashfree/return?order_id={order_id}`;
+      }
+
+      const orderMeta = {
+        return_url: returnUrl
+      };
+      if (process.env.WEBHOOK_BASE_URL) {
+        orderMeta.notify_url = `${process.env.WEBHOOK_BASE_URL}/api/cashfree/webhook`;
+      }
+
       const cfPayload = {
         order_id: orderId,
         order_amount: siteConfig.product.price, // ₹39
@@ -69,19 +87,16 @@ router.post('/create-order', async (req, res) => {
           customer_email: email.trim().toLowerCase(),
           customer_phone: cleanPhone
         },
-        order_meta: {
-          return_url: `${baseUrl}/api/cashfree/return?order_id={order_id}`,
-          notify_url: `${baseUrl}/api/cashfree/webhook`
-        },
+        order_meta: orderMeta,
         order_note: `${siteConfig.product.title} - CBSE 2026/27`
       };
 
-      const cfRes = await fetch(`${CASHFREE_BASE_URL}/orders`, {
+      const cfRes = await fetch(`${cfConfig.baseUrl}/orders`, {
         method: 'POST',
         headers: {
-          'x-client-id': CASHFREE_APP_ID,
-          'x-client-secret': CASHFREE_SECRET_KEY,
-          'x-api-version': CASHFREE_API_VERSION,
+          'x-client-id': cfConfig.appId,
+          'x-client-secret': cfConfig.secretKey,
+          'x-api-version': cfConfig.apiVersion,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(cfPayload)
@@ -113,7 +128,7 @@ router.post('/create-order', async (req, res) => {
         orderId: dbOrder.id,
         cashfreeOrderId: orderId,
         paymentSessionId: cfData.payment_session_id,
-        environment: CASHFREE_ENV,
+        environment: cfConfig.env,
         amount: siteConfig.product.price,
         product: {
           title: siteConfig.product.title,
@@ -132,7 +147,7 @@ router.post('/create-order', async (req, res) => {
       });
 
     } else {
-      // Test simulation fallback when keys are not yet added in .env
+      // Test simulation fallback only when keys are not configured
       console.log('⚠️ Cashfree credentials not configured in .env - Running in Simulation Mode');
 
       const dbOrder = Database.createOrder({
@@ -179,7 +194,7 @@ router.post('/create-order', async (req, res) => {
 // POST /api/cashfree/verify
 router.post('/verify', async (req, res) => {
   try {
-    const { order_id, isSimulation } = req.body;
+    const { order_id } = req.body;
 
     if (!order_id) {
       return res.status(400).json({ error: 'Order ID required for verification' });
@@ -201,15 +216,16 @@ router.post('/verify', async (req, res) => {
 
     let paymentId = `cf_pay_${Date.now()}`;
     let paymentMethod = 'Cashfree PG';
+    const cfConfig = getCashfreeConfig();
 
-    if (hasValidCredentials() && !isSimulation) {
-      // Query Cashfree Order Status directly from API
-      const checkRes = await fetch(`${CASHFREE_BASE_URL}/orders/${order_id}`, {
+    if (cfConfig.isValid) {
+      // Query Cashfree Order Status directly from API - STRICT VERIFICATION
+      const checkRes = await fetch(`${cfConfig.baseUrl}/orders/${order_id}`, {
         method: 'GET',
         headers: {
-          'x-client-id': CASHFREE_APP_ID,
-          'x-client-secret': CASHFREE_SECRET_KEY,
-          'x-api-version': CASHFREE_API_VERSION
+          'x-client-id': cfConfig.appId,
+          'x-client-secret': cfConfig.secretKey,
+          'x-api-version': cfConfig.apiVersion
         }
       });
 
@@ -217,17 +233,17 @@ router.post('/verify', async (req, res) => {
 
       if (checkData.order_status !== 'PAID') {
         return res.status(400).json({ 
-          error: `Payment status: ${checkData.order_status || 'NOT PAID'}. Agar aapke paise kat gaye hain to support par WhatsApp karein.` 
+          error: `Payment status: ${checkData.order_status || 'NOT PAID'}. Bina payment poori kiye PDF unlock nahi ho sakti.` 
         });
       }
 
-      // Try fetching payment details for exact payment_id
+      // Fetch payment details for exact payment_id
       try {
-        const payRes = await fetch(`${CASHFREE_BASE_URL}/orders/${order_id}/payments`, {
+        const payRes = await fetch(`${cfConfig.baseUrl}/orders/${order_id}/payments`, {
           headers: {
-            'x-client-id': CASHFREE_APP_ID,
-            'x-client-secret': CASHFREE_SECRET_KEY,
-            'x-api-version': CASHFREE_API_VERSION
+            'x-client-id': cfConfig.appId,
+            'x-client-secret': cfConfig.secretKey,
+            'x-api-version': cfConfig.apiVersion
           }
         });
         const payments = await payRes.json();
@@ -297,13 +313,14 @@ router.get('/return', async (req, res) => {
       return res.redirect(`/success?token=${order.downloadToken}&orderId=${order.id}`);
     }
 
-    if (hasValidCredentials()) {
-      const checkRes = await fetch(`${CASHFREE_BASE_URL}/orders/${order_id}`, {
+    const cfConfig = getCashfreeConfig();
+    if (cfConfig.isValid) {
+      const checkRes = await fetch(`${cfConfig.baseUrl}/orders/${order_id}`, {
         method: 'GET',
         headers: {
-          'x-client-id': CASHFREE_APP_ID,
-          'x-client-secret': CASHFREE_SECRET_KEY,
-          'x-api-version': CASHFREE_API_VERSION
+          'x-client-id': cfConfig.appId,
+          'x-client-secret': cfConfig.secretKey,
+          'x-api-version': cfConfig.apiVersion
         }
       });
       const checkData = await checkRes.json();
