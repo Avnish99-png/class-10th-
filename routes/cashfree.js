@@ -10,39 +10,50 @@ const EmailService = require('../utils/email');
 
 // Dynamic Cashfree Gateway Credentials resolution
 function getCashfreeConfig() {
+  const envPath = path.join(__dirname, '..', '.env');
+  require('dotenv').config({ path: envPath });
+
   let appId = (process.env.CASHFREE_APP_ID || '').trim();
   let secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
-  let env = (process.env.CASHFREE_ENV || 'PROD').toUpperCase(); // TEST or PROD
+  let rawEnv = (process.env.CASHFREE_ENV || 'production').trim().toLowerCase();
+
+  // Standardize environment to "sandbox" or "production"
+  let env = (rawEnv === 'sandbox' || rawEnv === 'test') ? 'sandbox' : 'production';
   const apiVersion = process.env.CASHFREE_API_VERSION || '2023-08-01';
 
-  // If process.env variables are missing, read directly from .env file
+  // Fallback direct file read if process.env wasn't populated
   if (!appId || !secretKey) {
     try {
-      const envPath = path.join(__dirname, '..', '.env');
       if (fs.existsSync(envPath)) {
         const envContent = fs.readFileSync(envPath, 'utf8');
-        const appMatch = envContent.match(/CASHFREE_APP_ID\s*=\s*([^\r\n]+)/);
-        const secMatch = envContent.match(/CASHFREE_SECRET_KEY\s*=\s*([^\r\n]+)/);
-        const envMatch = envContent.match(/CASHFREE_ENV\s*=\s*([^\r\n]+)/);
-        if (appMatch) appId = appMatch[1].trim();
-        if (secMatch) secretKey = secMatch[1].trim();
-        if (envMatch) env = envMatch[1].trim().toUpperCase();
+        const appMatch = envContent.match(/^CASHFREE_APP_ID\s*=\s*(.*)$/m);
+        const secMatch = envContent.match(/^CASHFREE_SECRET_KEY\s*=\s*(.*)$/m);
+        const envMatch = envContent.match(/^CASHFREE_ENV\s*=\s*(.*)$/m);
+        if (appMatch && appMatch[1].trim()) appId = appMatch[1].trim();
+        if (secMatch && secMatch[1].trim()) secretKey = secMatch[1].trim();
+        if (envMatch && envMatch[1].trim()) {
+          const fileEnv = envMatch[1].trim().toLowerCase();
+          env = (fileEnv === 'sandbox' || fileEnv === 'test') ? 'sandbox' : 'production';
+        }
       }
     } catch (e) {
-      console.error('Error reading .env directly:', e);
+      // Silently continue
     }
   }
 
-  const baseUrl = env === 'PROD' 
-    ? 'https://api.cashfree.com/pg' 
-    : 'https://sandbox.cashfree.com/pg';
-  const isValid = Boolean(
-    appId && 
-    secretKey && 
-    !appId.includes('YOUR_') && 
-    !secretKey.includes('YOUR_')
-  );
-  return { appId, secretKey, env, apiVersion, baseUrl, isValid };
+  // Base URL strictly matching CASHFREE_ENV
+  const baseUrl = env === 'sandbox' 
+    ? 'https://sandbox.cashfree.com/pg' 
+    : 'https://api.cashfree.com/pg';
+
+  // Audit missing variables
+  const missingVars = [];
+  if (!appId || appId.includes('YOUR_')) missingVars.push('CASHFREE_APP_ID');
+  if (!secretKey || secretKey.includes('YOUR_')) missingVars.push('CASHFREE_SECRET_KEY');
+
+  const isValid = missingVars.length === 0;
+
+  return { appId, secretKey, env, apiVersion, baseUrl, isValid, missingVars };
 }
 
 // Helper: Indian mobile number validation
@@ -72,109 +83,110 @@ router.post('/create-order', async (req, res) => {
       return res.status(400).json({ error: 'Kripya sahi 10-digit WhatsApp number enter karein' });
     }
 
+    const cfConfig = getCashfreeConfig();
+
+    if (!cfConfig.isValid) {
+      // Log exact missing variable name(s) to server console (NEVER log the secret key value)
+      console.error(`[Cashfree Config Error] Missing or invalid environment variable(s): ${cfConfig.missingVars.join(', ')}`);
+      console.error('[Cashfree Config Error] Please set CASHFREE_APP_ID and CASHFREE_SECRET_KEY in your .env file or server environment variables.');
+      return res.status(500).json({ 
+        error: 'Payment gateway abhi temporarily unavailable hai. Kripya thodi der baad prayas karein ya WhatsApp support par sampark karein.' 
+      });
+    }
+
     const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '').slice(-10);
     const orderId = `cf_ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
-    const cfConfig = getCashfreeConfig();
 
-    if (cfConfig.isValid) {
-      // Real Cashfree API Call
-      console.log(`Connecting to Cashfree (${cfConfig.env}) at: ${cfConfig.baseUrl}/orders`);
-      
-      // Cashfree Production requires https return_url
-      let returnUrl;
-      if (process.env.APP_BASE_URL) {
-        returnUrl = `${process.env.APP_BASE_URL}/api/cashfree/return?order_id={order_id}`;
-      } else {
-        const safeProtocol = (protocol === 'https' || cfConfig.env === 'PROD') ? 'https' : protocol;
-        returnUrl = `${safeProtocol}://${host}/api/cashfree/return?order_id={order_id}`;
-      }
-
-      const orderMeta = {
-        return_url: returnUrl
-      };
-      if (process.env.WEBHOOK_BASE_URL) {
-        orderMeta.notify_url = `${process.env.WEBHOOK_BASE_URL}/api/cashfree/webhook`;
-      }
-
-      const cfPayload = {
-        order_id: orderId,
-        order_amount: siteConfig.product.price, // ₹39
-        order_currency: 'INR',
-        customer_details: {
-          customer_id: `cust_${cleanPhone}`,
-          customer_name: name.trim(),
-          customer_email: email.trim().toLowerCase(),
-          customer_phone: cleanPhone
-        },
-        order_meta: orderMeta,
-        order_note: `${siteConfig.product.title} - CBSE 2026/27`
-      };
-
-      const cfRes = await fetch(`${cfConfig.baseUrl}/orders`, {
-        method: 'POST',
-        headers: {
-          'x-client-id': cfConfig.appId,
-          'x-client-secret': cfConfig.secretKey,
-          'x-api-version': cfConfig.apiVersion,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(cfPayload)
-      });
-
-      const cfData = await cfRes.json();
-
-      if (!cfRes.ok || !cfData.payment_session_id) {
-        console.error('Cashfree API error:', cfData);
-        return res.status(500).json({ 
-          error: cfData.message || 'Cashfree payment session create nahi ho paya. Kripya details check karein.' 
-        });
-      }
-
-      // Save to DB
-      const dbOrder = Database.createOrder({
-        cashfreeOrderId: orderId,
-        gateway: 'cashfree',
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: cleanPhone,
-        amount: siteConfig.product.price,
-        currency: 'INR',
-        status: 'created'
-      });
-
-      return res.json({
-        success: true,
-        orderId: dbOrder.id,
-        cashfreeOrderId: orderId,
-        paymentSessionId: cfData.payment_session_id,
-        payment_session_id: cfData.payment_session_id,
-        environment: cfConfig.env,
-        amount: siteConfig.product.price,
-        product: {
-          title: siteConfig.product.title,
-          price: siteConfig.product.price
-        },
-        customer: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone: cleanPhone
-        },
-        prefill: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          contact: cleanPhone
-        }
-      });
-
+    console.log(`Connecting to Cashfree (${cfConfig.env}) at: ${cfConfig.baseUrl}/orders`);
+    
+    // Cashfree Production requires https return_url
+    let returnUrl;
+    if (process.env.APP_BASE_URL) {
+      returnUrl = `${process.env.APP_BASE_URL}/api/cashfree/return?order_id={order_id}`;
     } else {
-      console.error('Cashfree credentials missing or invalid');
+      const safeProtocol = (protocol === 'https' || cfConfig.env === 'production') ? 'https' : protocol;
+      returnUrl = `${safeProtocol}://${host}/api/cashfree/return?order_id={order_id}`;
+    }
+
+    const orderMeta = {
+      return_url: returnUrl
+    };
+    if (process.env.WEBHOOK_BASE_URL) {
+      orderMeta.notify_url = `${process.env.WEBHOOK_BASE_URL}/api/cashfree/webhook`;
+    }
+
+    const cfPayload = {
+      order_id: orderId,
+      order_amount: siteConfig.product.price, // ₹39
+      order_currency: 'INR',
+      customer_details: {
+        customer_id: `cust_${cleanPhone}`,
+        customer_name: name.trim(),
+        customer_email: email.trim().toLowerCase(),
+        customer_phone: cleanPhone
+      },
+      order_meta: orderMeta,
+      order_note: `${siteConfig.product.title} - CBSE 2026/27`
+    };
+
+    const cfRes = await fetch(`${cfConfig.baseUrl}/orders`, {
+      method: 'POST',
+      headers: {
+        'x-client-id': cfConfig.appId,
+        'x-client-secret': cfConfig.secretKey,
+        'x-api-version': cfConfig.apiVersion,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(cfPayload)
+    });
+
+    const cfData = await cfRes.json();
+
+    if (!cfRes.ok || !cfData.payment_session_id) {
+      console.error('Cashfree API error:', cfData);
       return res.status(500).json({ 
-        error: 'Cashfree credentials configure nahi hain. Kripya support se sampark karein.' 
+        error: cfData.message || 'Cashfree payment session create nahi ho paya. Kripya details check karein.' 
       });
     }
+
+    // Save to DB
+    const dbOrder = Database.createOrder({
+      cashfreeOrderId: orderId,
+      gateway: 'cashfree',
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: cleanPhone,
+      amount: siteConfig.product.price,
+      currency: 'INR',
+      status: 'created'
+    });
+
+    return res.json({
+      success: true,
+      orderId: dbOrder.id,
+      cashfreeOrderId: orderId,
+      paymentSessionId: cfData.payment_session_id,
+      payment_session_id: cfData.payment_session_id,
+      environment: cfConfig.env,
+      amount: siteConfig.product.price,
+      product: {
+        title: siteConfig.product.title,
+        price: siteConfig.product.price
+      },
+      customer: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: cleanPhone
+      },
+      prefill: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        contact: cleanPhone
+      }
+    });
 
   } catch (err) {
     console.error('Cashfree order creation error:', err);

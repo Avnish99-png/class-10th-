@@ -270,7 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const mode = (orderData.environment && orderData.environment.toLowerCase() === 'prod') 
+    const rawEnv = (orderData.environment || '').toLowerCase();
+    const mode = (rawEnv === 'production' || rawEnv === 'prod') 
       ? 'production' 
       : 'sandbox';
 
