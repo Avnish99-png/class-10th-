@@ -41,7 +41,9 @@ const Database = {
     const orders = readOrders();
     const newOrder = {
       id: orderData.id || `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      razorpayOrderId: orderData.razorpayOrderId,
+      razorpayOrderId: orderData.razorpayOrderId || null,
+      cashfreeOrderId: orderData.cashfreeOrderId || null,
+      gateway: orderData.gateway || 'cashfree',
       razorpayPaymentId: orderData.razorpayPaymentId || null,
       name: orderData.name,
       email: orderData.email,
@@ -59,10 +61,22 @@ const Database = {
     return newOrder;
   },
 
+  // Find order by Cashfree / Razorpay / Internal Order ID
+  findByAnyOrderId(orderId) {
+    const orders = readOrders();
+    return orders.find(o => o.id === orderId || o.cashfreeOrderId === orderId || o.razorpayOrderId === orderId);
+  },
+
   // Find order by Razorpay Order ID
   findByRazorpayOrderId(orderId) {
     const orders = readOrders();
-    return orders.find(o => o.razorpayOrderId === orderId);
+    return orders.find(o => o.razorpayOrderId === orderId || o.cashfreeOrderId === orderId || o.id === orderId);
+  },
+
+  // Find order by Cashfree Order ID
+  findByCashfreeOrderId(orderId) {
+    const orders = readOrders();
+    return orders.find(o => o.cashfreeOrderId === orderId || o.id === orderId);
   },
 
   // Find order by internal ID
@@ -78,14 +92,17 @@ const Database = {
   },
 
   // Update order status after payment verification
-  markAsPaid(razorpayOrderId, paymentId, downloadToken, options = {}) {
+  markAsPaid(orderId, paymentId, downloadToken, options = {}) {
     const orders = readOrders();
-    const orderIndex = orders.findIndex(o => o.razorpayOrderId === razorpayOrderId);
+    const orderIndex = orders.findIndex(o => 
+      o.id === orderId || o.cashfreeOrderId === orderId || o.razorpayOrderId === orderId
+    );
     if (orderIndex === -1) return null;
 
     orders[orderIndex].status = 'paid';
+    orders[orderIndex].paymentId = paymentId;
     orders[orderIndex].razorpayPaymentId = paymentId;
-    orders[orderIndex].paymentMethod = options.paymentMethod || 'UPI QR';
+    orders[orderIndex].paymentMethod = options.paymentMethod || 'Cashfree';
     orders[orderIndex].utrNumber = options.utrNumber || paymentId;
     orders[orderIndex].downloadToken = downloadToken;
     orders[orderIndex].paidAt = new Date().toISOString();
@@ -94,6 +111,7 @@ const Database = {
     writeOrders(orders);
     return orders[orderIndex];
   },
+
 
 
   // Increment download counter

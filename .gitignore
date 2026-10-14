@@ -3,3 +3,5 @@ temp_repo/
 *.log
 .DS_Store
 Thumbs.db
+.env
+

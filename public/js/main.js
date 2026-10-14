@@ -16,7 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const stickyBar = document.getElementById('stickyMobileCta');
   const heroSection = document.getElementById('hero');
 
-  // Load Razorpay Script dynamically if not already loaded
+  // Load Cashfree and Razorpay Scripts dynamically if not already loaded
+  function loadCashfreeSdk() {
+    return new Promise((resolve) => {
+      if (window.Cashfree) return resolve(true);
+      const script = document.createElement('script');
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        console.warn('Cashfree SDK could not be loaded from CDN.');
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  }
+
   function loadRazorpaySdk() {
     return new Promise((resolve) => {
       if (window.Razorpay) return resolve(true);
@@ -32,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  loadCashfreeSdk();
   loadRazorpaySdk();
 
   // Modal Open/Close
@@ -183,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return valid;
   }
 
-  // Form Submit Handler
+  // Form Submit Handler (Cashfree PG)
   paymentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -198,11 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set loading state
     submitBtn.disabled = true;
     const originalBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<span>Checking Gateway... ⏳</span>';
+    submitBtn.innerHTML = '<span>Connecting to Cashfree... ⏳</span>';
 
     try {
-      // 1. Create order on server
-      const res = await fetch('/api/create-order', {
+      // 1. Create order on server via Cashfree
+      const res = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, phone })
@@ -214,13 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.error || 'Order create nahi ho paya');
       }
 
-      // Check if real Razorpay or simulation mode
-      if (data.isTestSimulation || !window.Razorpay || data.keyId === 'rzp_test_simulation') {
-        // Run test simulator modal
+      // Check if real Cashfree or simulation mode
+      if (data.isSimulation || !data.paymentSessionId) {
+        // Run test / UPI QR simulator modal
         handleTestPaymentSimulation(data);
       } else {
-        // Open Real Razorpay Checkout
-        openRazorpayCheckout(data);
+        // Open Real Cashfree Checkout Modal
+        openCashfreeCheckout(data);
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -230,72 +246,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Real Razorpay Checkout Handler
-  function openRazorpayCheckout(orderData) {
-    const options = {
-      key: orderData.keyId,
-      amount: orderData.amount,
-      currency: orderData.currency || 'INR',
-      name: 'Think Unlimited',
-      description: 'Class 10 Maths Made Easy (PDF E-Book)',
-      order_id: orderData.razorpayOrderId,
-      prefill: orderData.prefill,
-      theme: {
-        color: '#0B1B3A'
-      },
-      modal: {
-        ondismiss: function () {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = 'Buy Now – ₹39 <span>→</span>';
-          trackAnalyticsEvent('PaymentDismissed');
-        }
-      },
-      handler: async function (response) {
-        submitBtn.innerHTML = '<span>Verifying Payment... 🔒</span>';
-        try {
-          const verifyRes = await fetch('/api/verify-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            })
-          });
+  // Real Cashfree Checkout Handler
+  async function openCashfreeCheckout(orderData) {
+    if (!window.Cashfree) {
+      await loadCashfreeSdk();
+    }
 
-          const verifyData = await verifyRes.json();
-          if (verifyRes.ok && verifyData.success) {
-            trackAnalyticsEvent('Purchase', { orderId: verifyData.orderId, value: 39, currency: 'INR' });
-            window.location.href = `/success?token=${verifyData.downloadToken}&orderId=${verifyData.orderId}`;
-          } else {
-            throw new Error(verifyData.error || 'Payment verify nahi ho paya.');
+    if (!window.Cashfree) {
+      console.warn('Cashfree SDK unavailable, falling back to UPI QR simulation.');
+      handleTestPaymentSimulation(orderData);
+      return;
+    }
+
+    try {
+      const mode = (orderData.environment && orderData.environment.toLowerCase() === 'prod') 
+        ? 'production' 
+        : 'sandbox';
+      
+      const cashfree = window.Cashfree({ mode });
+      
+      cashfree.checkout({
+        paymentSessionId: orderData.paymentSessionId,
+        redirectTarget: '_modal'
+      }).then(async (result) => {
+        if (result.error) {
+          console.warn('Cashfree modal error or closed:', result.error);
+          if (result.error.message && !result.error.message.includes('closed') && !result.error.message.includes('dismissed')) {
+            alert('Payment notification: ' + result.error.message);
           }
-        } catch (vErr) {
-          console.error('Verification error:', vErr);
-          alert(`Payment ho gaya par verification mein problem aayi: ${vErr.message}\nChinta mat kijiye, hamare WhatsApp (9243791529) par turant message karein.`);
           submitBtn.disabled = false;
-          submitBtn.innerHTML = 'Buy Now – ₹39 <span>→</span>';
+          submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+          return;
         }
-      }
-    };
 
-    const rzp = new window.Razorpay(options);
-    rzp.on('payment.failed', function (response) {
-      console.warn('Payment failed:', response.error);
-      fetch('/api/payment-failed', {
+        if (result.redirect) {
+          // Cashfree handles page redirect
+          return;
+        }
+
+        submitBtn.innerHTML = '<span>Verifying Payment... 🔒</span>';
+        await verifyCashfreeOrder(orderData.cashfreeOrderId);
+      });
+    } catch (err) {
+      console.error('Cashfree checkout modal error:', err);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+      alert('Cashfree window open nahi ho payi: ' + err.message);
+    }
+  }
+
+  // Cashfree Verification Handler
+  async function verifyCashfreeOrder(orderId) {
+    try {
+      const verifyRes = await fetch('/api/cashfree/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          razorpay_order_id: orderData.razorpayOrderId,
-          reason: response.error.description
-        })
+        body: JSON.stringify({ order_id: orderId })
       });
-      alert(`Payment fail ho gaya: ${response.error.description}\nKripya UPI ya doosra card try karein.`);
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = 'Buy Now – ₹39 <span>→</span>';
-    });
 
-    rzp.open();
+      const verifyData = await verifyRes.json();
+      if (verifyRes.ok && verifyData.success) {
+        trackAnalyticsEvent('Purchase', { 
+          orderId: verifyData.orderId, 
+          value: 39, 
+          currency: 'INR',
+          gateway: 'cashfree'
+        });
+        window.location.href = `/success?token=${verifyData.downloadToken}&orderId=${verifyData.orderId}`;
+      } else {
+        throw new Error(verifyData.error || 'Payment verify nahi ho paya.');
+      }
+    } catch (vErr) {
+      console.error('Cashfree verification error:', vErr);
+      alert(`Payment complete ho gaya par verification pending hai: ${vErr.message}\nChinta mat kijiye, WhatsApp (9243791529) par turant message karein.`);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
+    }
   }
 
   // PhonePe UPI QR & Instant Payment Flow
@@ -324,8 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Buyer Info Chip -->
         <div style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 10px; margin-bottom: 14px; font-size: 0.8rem; display: flex; justify-content: space-between; flex-wrap: wrap;">
-          <span><strong>Student:</strong> ${escapeHtml(orderData.prefill.name)}</span>
-          <span><strong>WhatsApp:</strong> +91 ${escapeHtml(orderData.prefill.contact)}</span>
+          <span><strong>Student:</strong> ${escapeHtml(orderData.prefill?.name || orderData.customer?.name || 'Student')}</span>
+          <span><strong>WhatsApp:</strong> +91 ${escapeHtml(orderData.prefill?.contact || orderData.customer?.phone || '')}</span>
         </div>
 
         <!-- PhonePe QR Code Container -->
@@ -413,15 +439,14 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmBtn.innerHTML = '<span>Verifying & Generating Link... 🔒</span>';
 
         try {
-          const verifyRes = await fetch('/api/verify-payment', {
+          const verifyOrderId = orderData.cashfreeOrderId || orderData.orderId || orderData.razorpayOrderId;
+          const verifyRes = await fetch('/api/cashfree/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              razorpay_order_id: orderData.razorpayOrderId,
-              razorpay_payment_id: utrVal || `UPI_${Date.now()}`,
-              utr_number: utrVal,
-              payment_method: 'PhonePe QR (9243791529@axl)',
-              isTestSimulation: true
+              order_id: verifyOrderId,
+              utr_number: utrVal || `UPI_${Date.now()}`,
+              isSimulation: true
             })
           });
 

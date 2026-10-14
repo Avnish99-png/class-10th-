@@ -37,6 +37,7 @@ app.get('/api/config', (req, res) => {
 
 // Mount Routes
 app.use('/api', require('./routes/payment'));
+app.use('/api/cashfree', require('./routes/cashfree'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/download', require('./routes/download'));
 
