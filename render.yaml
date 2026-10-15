@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: class10-maths-ebook
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: CASHFREE_ENV
+        value: production
+      - key: CASHFREE_API_VERSION
+        value: 2023-08-01
+      - key: DOWNLOAD_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        value: thinkunlimited2026
+      - key: CASHFREE_APP_ID
+        sync: false
+      - key: CASHFREE_SECRET_KEY
+        sync: false

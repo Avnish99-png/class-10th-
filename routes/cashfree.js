@@ -102,10 +102,11 @@ router.post('/create-order', async (req, res) => {
 
     console.log(`Connecting to Cashfree (${cfConfig.env}) at: ${cfConfig.baseUrl}/orders`);
     
-    // Cashfree Production requires https return_url
+    // Auto-detect production deployed base URL (Render, Railway, custom domain)
+    const appBase = (process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
     let returnUrl;
-    if (process.env.APP_BASE_URL) {
-      returnUrl = `${process.env.APP_BASE_URL}/api/cashfree/return?order_id={order_id}`;
+    if (appBase) {
+      returnUrl = `${appBase.replace(/\/$/, '')}/api/cashfree/return?order_id={order_id}`;
     } else {
       const safeProtocol = (protocol === 'https' || cfConfig.env === 'production') ? 'https' : protocol;
       returnUrl = `${safeProtocol}://${host}/api/cashfree/return?order_id={order_id}`;
@@ -114,8 +115,9 @@ router.post('/create-order', async (req, res) => {
     const orderMeta = {
       return_url: returnUrl
     };
-    if (process.env.WEBHOOK_BASE_URL) {
-      orderMeta.notify_url = `${process.env.WEBHOOK_BASE_URL}/api/cashfree/webhook`;
+    if (process.env.WEBHOOK_BASE_URL || appBase) {
+      const webhookBase = (process.env.WEBHOOK_BASE_URL || appBase).replace(/\/$/, '');
+      orderMeta.notify_url = `${webhookBase}/api/cashfree/webhook`;
     }
 
     const cfPayload = {
