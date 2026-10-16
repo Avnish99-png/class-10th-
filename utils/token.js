@@ -1,14 +1,18 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const crypto = require('crypto');
 const siteConfig = require('../config/site.config');
 
-const SECRET = process.env.DOWNLOAD_SECRET || 'think_unlimited_super_secure_secret_2026_class10';
+function getSecret() {
+  return process.env.DOWNLOAD_SECRET || 'think_unlimited_super_secure_secret_2026_class10';
+}
 
 const TokenManager = {
   // Generate secure expiring token
   createDownloadToken(orderId, email) {
     const expiresAt = Date.now() + (siteConfig.security.tokenExpiryHours * 60 * 60 * 1000);
     const payload = `${orderId}:${email}:${expiresAt}`;
-    const hmac = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+    const hmac = crypto.createHmac('sha256', getSecret()).update(payload).digest('hex');
     // Base64url encode payload + signature
     const token = Buffer.from(`${payload}:${hmac}`).toString('base64url');
     return token;
@@ -27,7 +31,7 @@ const TokenManager = {
       const expiresAt = parseInt(expiresAtStr, 10);
       const payload = `${orderId}:${email}:${expiresAt}`;
 
-      const expectedHmac = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+      const expectedHmac = crypto.createHmac('sha256', getSecret()).update(payload).digest('hex');
 
       // Constant-time comparison to prevent timing attacks
       const sigBuffer = Buffer.from(signature, 'hex');
