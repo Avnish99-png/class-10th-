@@ -16,7 +16,7 @@ module.exports = {
     price: 39,          // Price in INR
     pricePaise: 3900,   // For Razorpay (1 INR = 100 paise)
     originalPrice: 79,  // Crossed-out price
-    pages: 20,
+    pages: 26,
     chapters: 14,
     format: 'Instant-download PDF'
   },
