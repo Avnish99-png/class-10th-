@@ -8,7 +8,7 @@ const siteConfig = require('../config/site.config');
 
 const PDF_FILE_PATH = path.join(__dirname, '..', 'private', 'ebook.pdf');
 
-router.get('/:token', (req, res) => {
+router.get('/:token', async (req, res) => {
   const { token } = req.params;
 
   if (!token) {
@@ -51,21 +51,31 @@ router.get('/:token', (req, res) => {
   // Record download count
   Database.recordDownload(token);
 
-  // Get file stats for Content-Length
-  const stat = fs.statSync(PDF_FILE_PATH);
   const filename = 'Class-10-Maths-Made-Easy-CBSE-ThinkUnlimited.pdf';
   const isInline = req.query.view === '1' || req.query.inline === '1';
 
-  // Stream PDF file with secure & robust headers
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Length', stat.size);
-  res.setHeader('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${filename}"`);
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  try {
+    const { generatePersonalizedPdf } = require('../utils/pdfProtector');
+    const pdfBuffer = await generatePersonalizedPdf(order.name, order.phone);
 
-  const fileStream = fs.createReadStream(PDF_FILE_PATH);
-  fileStream.pipe(res);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error('Error personalizing PDF, falling back to static file:', err);
+    const stat = fs.statSync(PDF_FILE_PATH);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    const fileStream = fs.createReadStream(PDF_FILE_PATH);
+    fileStream.pipe(res);
+  }
 });
 
 

@@ -43,9 +43,15 @@ const EmailService = {
           </div>
 
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${downloadUrl}" style="background: #FFC700; color: #0B1B3A; padding: 14px 28px; text-decoration: none; font-weight: 800; font-size: 16px; border-radius: 6px; border: 2px solid #0B1B3A; display: inline-block; box-shadow: 3px 3px 0 #0B1B3A;">
+            <a href="${downloadUrl}" style="background: #FFC700; color: #0B1B3A; padding: 14px 28px; text-decoration: none; font-weight: 800; font-size: 16px; border-radius: 6px; border: 2px solid #0B1B3A; display: inline-block; box-shadow: 3px 39px 0 #0B1B3A;">
               📥 Click Here to Download PDF
             </a>
+          </div>
+
+          <div style="background: #FEF3C7; border: 1.5px solid #D97706; padding: 12px; margin: 18px 0; border-radius: 6px; text-align: left;">
+            <p style="margin: 0; font-size: 14px; color: #92400E;">
+              🔒 <strong>PDF Password:</strong> File open karne ka password aapka <strong>10-digit mobile number</strong> (${order.phone}) hai.
+            </p>
           </div>
 
           <p style="font-size: 13px; color: #555; line-height: 1.5;">
