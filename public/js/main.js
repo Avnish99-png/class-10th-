@@ -325,48 +325,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Floating Close Button for Cashfree Modal
+  let cfObserver = null;
+
   function showFloatingCloseBtn() {
     removeFloatingCloseBtn();
+
     const btn = document.createElement('button');
     btn.id = 'cfModalCustomCloseBtn';
-    btn.innerHTML = '✕ Close';
-    btn.setAttribute('aria-label', 'Close Payment Modal');
-    btn.style.cssText = `
-      position: fixed;
-      top: 18px;
-      right: 22px;
-      z-index: 2147483647;
-      background: #0B1B3A;
-      color: #FFFFFF;
-      border: 2px solid #FFC700;
-      border-radius: 30px;
-      padding: 8px 18px;
-      font-size: 14px;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+      <span style="font-size: 14px; font-weight: 800; letter-spacing: 0.5px;">Close</span>
     `;
-    btn.onmouseover = () => { btn.style.background = '#F24659'; btn.style.borderColor = '#FFFFFF'; };
-    btn.onmouseout = () => { btn.style.background = '#0B1B3A'; btn.style.borderColor = '#FFC700'; };
+    btn.setAttribute('aria-label', 'Close Payment Screen');
+    btn.setAttribute('style', `
+      position: fixed !important;
+      top: 14px !important;
+      right: 18px !important;
+      z-index: 2147483647 !important;
+      background: #0B1B3A !important;
+      color: #FFFFFF !important;
+      border: 2px solid #FFC700 !important;
+      border-radius: 40px !important;
+      padding: 9px 18px !important;
+      cursor: pointer !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 7px !important;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6) !important;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      pointer-events: auto !important;
+      transition: all 0.2s ease !important;
+    `);
 
-    btn.onclick = () => {
-      // Find and remove any Cashfree modal container/iframes
-      const cfElements = document.querySelectorAll('iframe[src*="cashfree"], div[id*="cashfree"], div[class*="cashfree"]');
+    btn.onmouseenter = () => { 
+      btn.style.setProperty('background', '#F24659', 'important'); 
+      btn.style.setProperty('border-color', '#FFFFFF', 'important'); 
+      btn.style.setProperty('transform', 'scale(1.05)', 'important');
+    };
+    btn.onmouseleave = () => { 
+      btn.style.setProperty('background', '#0B1B3A', 'important'); 
+      btn.style.setProperty('border-color', '#FFC700', 'important'); 
+      btn.style.setProperty('transform', 'scale(1)', 'important');
+    };
+
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Remove Cashfree modal elements
+      const cfElements = document.querySelectorAll('iframe[src*="cashfree"], iframe[name*="modal"], div[id*="cashfree"], div[class*="cashfree"]');
       cfElements.forEach(el => el.remove());
+      // Restore page scrolling
+      document.body.style.removeProperty('overflow');
+      document.documentElement.style.removeProperty('overflow');
       removeFloatingCloseBtn();
       submitBtn.disabled = false;
       submitBtn.innerHTML = 'Proceed to Pay – ₹39 <span>→</span>';
     };
 
     document.body.appendChild(btn);
+
+    // Keep close button on top if Cashfree injects iframes after this
+    const bringToFront = () => {
+      const current = document.getElementById('cfModalCustomCloseBtn');
+      if (current && document.body.lastElementChild !== current) {
+        document.body.appendChild(current);
+      }
+    };
+
+    // Watch for DOM changes so button stays on top
+    if (window.MutationObserver) {
+      cfObserver = new MutationObserver(() => bringToFront());
+      cfObserver.observe(document.body, { childList: true });
+    }
+
+    setTimeout(bringToFront, 200);
+    setTimeout(bringToFront, 600);
+    setTimeout(bringToFront, 1200);
   }
 
   function removeFloatingCloseBtn() {
+    if (cfObserver) {
+      cfObserver.disconnect();
+      cfObserver = null;
+    }
     const existing = document.getElementById('cfModalCustomCloseBtn');
     if (existing) existing.remove();
   }
